@@ -49,10 +49,17 @@ export default function MultiChannelPreview({ post, imageDataUrl, onPublishSucce
             {/* Header & Platform Toggle */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
                 <div>
-                    <h4 style={{ fontSize: '1.1rem', fontWeight: 700, marginBottom: '0.2rem' }}>
-                        Multi-Platform Social Live Preview
-                    </h4>
-                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.2rem' }}>
+                        <h4 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                            Multi-Platform Social Live Preview
+                        </h4>
+                        {post.aiEngine && (
+                            <span className="badge badge-purple" style={{ fontSize: '0.72rem', padding: '0.2rem 0.55rem' }}>
+                                ✨ {post.aiEngine}
+                            </span>
+                        )}
+                    </div>
+                    <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
                         Formatted specifically for each platform's algorithms & best practices.
                     </p>
                 </div>

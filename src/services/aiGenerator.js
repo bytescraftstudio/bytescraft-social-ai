@@ -1,27 +1,195 @@
 import { BYTESCRAFT_SERVICES } from './templates';
+import { getApiConfig } from './socialPublisher';
 
 /**
  * Autonomous Content Generator Engine for BytesCraft Studio
+ * Supports Google Gemini AI (1.5 Flash / 2.0 Flash / Pro) with seamless fallback
  */
-export function generateSocialPostBundle({ serviceId, goalId, customPrompt, themeId = 'cyber-dark' }) {
+
+export async function generateSocialPostBundle({ serviceId, goalId, customPrompt, sourceData, themeId = 'cyber-dark' }) {
+    const config = getApiConfig();
     const service = BYTESCRAFT_SERVICES.find(s => s.id === serviceId) || BYTESCRAFT_SERVICES[0];
 
-    // Base topic determination
-    const topicTitle = customPrompt ? customPrompt : `${service.name}: Scalable Tech Solutions for Modern Startups`;
+    // If user provided a Gemini API Key, generate with Google Gemini
+    if (config.geminiApiKey && config.geminiApiKey.trim()) {
+        try {
+            const geminiResult = await generateWithGemini({
+                apiKey: config.geminiApiKey.trim(),
+                model: config.geminiModel || 'gemini-1.5-flash',
+                service,
+                goalId,
+                customPrompt,
+                sourceData,
+                themeId
+            });
+            if (geminiResult) {
+                return geminiResult;
+            }
+        } catch (err) {
+            console.warn('[Gemini AI] Call failed, switching to smart fallback template:', err.message);
+        }
+    }
 
-    // Script / Core Idea
+    // Fallback: Built-in high performance template generator
+    return generateFallbackSocialPostBundle({ serviceId, goalId, customPrompt, themeId });
+}
+
+/**
+ * Direct Google Gemini REST API Generator
+ */
+async function generateWithGemini({ apiKey, model, service, goalId, customPrompt, sourceData, themeId }) {
+    const topicInstruction = customPrompt && customPrompt.trim()
+        ? `Focus Topic: "${customPrompt.trim()}"`
+        : `Focus Service: "${service.name}" (${service.tagline})`;
+
+    const sourceDataInstruction = sourceData && sourceData.trim()
+        ? `Source Data / Reference Material to Process:\n"""\n${sourceData.trim()}\n"""\nIMPORTANT: Extract key insights from the Source Data provided above and use them as the primary context for the post content.`
+        : '';
+
+    const promptText = `
+You are the Lead Content Strategist and Tech Evangelist for BytesCraft Studio (https://www.bytescraftstudio.com).
+BytesCraft Studio is a top-tier software engineering agency specializing in high-speed web apps, mobile apps, practical AI workflows, SaaS platforms, UI/UX, and cloud infrastructure.
+
+Target Service: ${service.name} (${service.category})
+Tagline: ${service.tagline}
+Key Tech: ${service.keywords.join(', ')}
+Strategy Goal: ${goalId}
+${topicInstruction}
+
+${sourceDataInstruction}
+
+Generate a viral, authoritative, high-conversion multi-channel social media post bundle.
+You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in markdown or anything else):
+{
+  "topicTitle": "Crisp headline (6 to 10 words)",
+  "scriptContent": "Core narrative script or technical hook explaining why BytesCraft Studio delivers superior engineering (3-4 punchy sentences)",
+  "linkedinCopy": "Full professional LinkedIn post with hook, bullet points of technical takeaways/ROI, and strong business CTA",
+  "instagramCopy": "Full Instagram caption with eye-catching emojis, bullet highlights, and engaging call-to-action",
+  "facebookCopy": "Full Facebook post formatted for business decision makers and founders",
+  "hashtags": {
+    "linkedin": ["#BytesCraftStudio", "#SoftwareEngineering", "#WebDev", "#TechLeaders"],
+    "instagram": ["#BytesCraftStudio", "#CodingLife", "#FullStack", "#DevCommunity", "#TechStartup"],
+    "facebook": ["#BytesCraftStudio", "#CustomSoftware", "#SoftwareCompany"]
+  },
+  "graphicTitle": "Short title for banner graphic (max 4 words)",
+  "graphicSubtitle": "Short subheader for banner graphic (max 7 words)",
+  "badgeText": "Short badge tag (e.g. HIGH PERFORMANCE, CLOUD SCALING, AI AGENTS)"
+}
+`;
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            contents: [
+                {
+                    parts: [{ text: promptText }]
+                }
+            ],
+            generationConfig: {
+                temperature: 0.7,
+                responseMimeType: 'application/json'
+            }
+        })
+    });
+
+    if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || `Gemini API returned status ${res.status}`);
+    }
+
+    const data = await res.json();
+    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!candidateText) {
+        throw new Error('No content received from Gemini API');
+    }
+
+    const parsed = parseGeminiJson(candidateText);
+    const callToAction = "🚀 Ready to build high-performance software? Let's talk: https://www.bytescraftstudio.com/";
+
+    const topicTitle = parsed.topicTitle || (customPrompt ? customPrompt : `${service.name}: Scalable Tech Solutions`);
+    const graphicConfig = {
+        title: parsed.graphicTitle || topicTitle,
+        subtitle: parsed.graphicSubtitle || service.tagline,
+        serviceName: service.name,
+        category: service.category,
+        badgeText: parsed.badgeText || service.badge,
+        theme: themeId,
+        accentColor: service.accent,
+        watermark: 'BYTESCRAFT STUDIO',
+        domain: 'www.bytescraftstudio.com'
+    };
+
+    const linkedinTags = (parsed.hashtags?.linkedin || ['#BytesCraftStudio', '#SoftwareEngineering']).join(' ');
+    const instagramTags = (parsed.hashtags?.instagram || ['#BytesCraftStudio', '#AITools', '#WebDev']).join(' ');
+    const facebookTags = (parsed.hashtags?.facebook || ['#BytesCraftStudio', '#TechInnovation']).join(' ');
+
+    return {
+        id: 'post-' + Date.now(),
+        createdAt: new Date().toISOString(),
+        service,
+        goalId,
+        topicTitle,
+        scriptContent: parsed.scriptContent || '',
+        graphicConfig,
+        platforms: {
+            linkedin: { text: `${parsed.linkedinCopy}\n\n${callToAction}\n\n${linkedinTags}` },
+            instagram: { text: `${parsed.instagramCopy}\n\n${callToAction}\n\n${instagramTags}` },
+            facebook: { text: `${parsed.facebookCopy}\n\n${callToAction}\n\n${facebookTags}` }
+        },
+        hashtags: parsed.hashtags || { linkedin: [], instagram: [], facebook: [] },
+        aiEngine: `Gemini (${model})`,
+        status: 'draft'
+    };
+}
+
+/**
+ * Test a Gemini API key
+ */
+export async function testGeminiApiKey(apiKey, model = 'gemini-1.5-flash') {
+    if (!apiKey || !apiKey.trim()) {
+        return { success: false, error: 'API key is empty' };
+    }
+
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Ping. Respond with valid JSON: {"status": "ok"}' }] }],
+                generationConfig: { responseMimeType: 'application/json' }
+            })
+        });
+
+        if (!res.ok) {
+            const data = await res.json().catch(() => ({}));
+            return { success: false, error: data.error?.message || `HTTP ${res.status}: ${res.statusText}` };
+        }
+
+        return { success: true, message: `Successfully connected to Gemini API (${model})!` };
+    } catch (err) {
+        return { success: false, error: err.message || 'Network connection failed' };
+    }
+}
+
+/**
+ * Built-in fallback template generator
+ */
+export function generateFallbackSocialPostBundle({ serviceId, goalId, customPrompt, themeId = 'cyber-dark' }) {
+    const service = BYTESCRAFT_SERVICES.find(s => s.id === serviceId) || BYTESCRAFT_SERVICES[0];
+    const topicTitle = customPrompt ? customPrompt : `${service.name}: Scalable Tech Solutions for Modern Startups`;
     const scriptContent = generateCoreScript(service, goalId, topicTitle);
 
-    // Platform Specific Copies
     const linkedinCopy = generateLinkedInCopy(service, scriptContent, topicTitle);
     const instagramCopy = generateInstagramCopy(service, scriptContent, topicTitle);
     const facebookCopy = generateFacebookCopy(service, scriptContent, topicTitle);
 
-    // Optimized Hashtags & CTA
     const hashtags = generateHashtags(service, goalId);
     const callToAction = "🚀 Ready to build high-performance software? Let's talk: https://www.bytescraftstudio.com/";
 
-    // Visual Graphic Configuration for Canvas Generator
     const graphicConfig = {
         title: topicTitle,
         subtitle: service.tagline,
@@ -48,8 +216,19 @@ export function generateSocialPostBundle({ serviceId, goalId, customPrompt, them
             facebook: { text: `${facebookCopy}\n\n${callToAction}\n\n${hashtags.facebook.join(' ')}` }
         },
         hashtags,
-        status: 'draft' // 'draft', 'scheduled', 'published'
+        aiEngine: 'Built-in Engine',
+        status: 'draft'
     };
+}
+
+function parseGeminiJson(rawText) {
+    let clean = rawText.trim();
+    if (clean.startsWith('```json')) {
+        clean = clean.replace(/^```json\s*/i, '').replace(/\s*```$/, '');
+    } else if (clean.startsWith('```')) {
+        clean = clean.replace(/^```\s*/, '').replace(/\s*```$/, '');
+    }
+    return JSON.parse(clean);
 }
 
 function generateCoreScript(service, goalId, topicTitle) {

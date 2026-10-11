@@ -2,11 +2,15 @@ import React, { useState } from 'react';
 import { Sparkles, Wand2, RefreshCw, Palette, Layers, Target, FileText } from 'lucide-react';
 import { BYTESCRAFT_SERVICES, GRAPHIC_THEMES, CONTENT_GOALS } from '../services/templates';
 
-export default function PostGenerator({ onGenerate, isGenerating }) {
+import { getApiConfig } from '../services/socialPublisher';
+
+export default function PostGenerator({ onGenerate, isGenerating, onOpenApiConfig }) {
     const [selectedService, setSelectedService] = useState(BYTESCRAFT_SERVICES[0].id);
     const [selectedGoal, setSelectedGoal] = useState(CONTENT_GOALS[0].id);
     const [selectedTheme, setSelectedTheme] = useState(GRAPHIC_THEMES[0].id);
     const [customPrompt, setCustomPrompt] = useState('');
+    const config = getApiConfig();
+    const isGeminiActive = Boolean(config.geminiApiKey && config.geminiApiKey.trim());
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -14,22 +18,49 @@ export default function PostGenerator({ onGenerate, isGenerating }) {
             serviceId: selectedService,
             goalId: selectedGoal,
             themeId: selectedTheme,
-            customPrompt: customPrompt.trim()
+            customPrompt: customPrompt.trim(),
+            sourceData: window.sourceData || ''
         });
     };
 
     return (
         <div className="glass-panel" style={{ padding: '2rem' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem' }}>
-                <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'var(--primary-gradient)', color: '#fff' }}>
-                    <Wand2 size={20} />
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '1rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                    <div style={{ padding: '0.5rem', borderRadius: '10px', background: 'var(--primary-gradient)', color: '#fff' }}>
+                        <Wand2 size={20} />
+                    </div>
+                    <div>
+                        <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>AI Post & Script Creator</h3>
+                        <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                            Select BytesCraft service spotlight or enter custom prompt for auto-generation.
+                        </p>
+                    </div>
                 </div>
-                <div>
-                    <h3 style={{ fontSize: '1.25rem', fontWeight: 700 }}>AI Post & Script Creator</h3>
-                    <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-                        Select BytesCraft service spotlight or enter custom prompt for auto-generation.
-                    </p>
-                </div>
+
+                {onOpenApiConfig && (
+                    <button
+                        type="button"
+                        onClick={onOpenApiConfig}
+                        style={{
+                            background: isGeminiActive ? 'rgba(168, 85, 247, 0.15)' : 'rgba(255, 255, 255, 0.05)',
+                            border: `1px solid ${isGeminiActive ? 'rgba(168, 85, 247, 0.4)' : 'rgba(255, 255, 255, 0.1)'}`,
+                            color: isGeminiActive ? '#c084fc' : 'var(--text-muted)',
+                            borderRadius: '20px',
+                            padding: '0.35rem 0.75rem',
+                            fontSize: '0.75rem',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '0.4rem',
+                            transition: 'all 0.2s'
+                        }}
+                    >
+                        <Sparkles size={13} color={isGeminiActive ? '#c084fc' : '#94a3b8'} />
+                        {isGeminiActive ? `Gemini AI (${config.geminiModel})` : 'Built-in Engine (Add Gemini API)'}
+                    </button>
+                )}
             </div>
 
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
@@ -133,26 +164,50 @@ export default function PostGenerator({ onGenerate, isGenerating }) {
                 </div>
 
                 {/* Optional Custom Topic Prompt */}
-                <div>
-                    <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
-                        <FileText size={16} color="#34d399" /> Custom Headline / Topic (Optional)
-                    </label>
-                    <input
-                        type="text"
-                        value={customPrompt}
-                        onChange={(e) => setCustomPrompt(e.target.value)}
-                        placeholder="e.g. Why Next.js 15 is a game-changer for BytesCraft clients..."
-                        style={{
-                            width: '100%',
-                            padding: '0.85rem 1rem',
-                            borderRadius: '12px',
-                            background: 'rgba(0, 0, 0, 0.4)',
-                            border: '1px solid var(--border-subtle)',
-                            color: '#fff',
-                            fontSize: '0.9rem',
-                            outline: 'none'
-                        }}
-                    />
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '1rem' }}>
+                    <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+                            <FileText size={16} color="#34d399" /> Custom Headline / Topic (Optional)
+                        </label>
+                        <input
+                            type="text"
+                            value={customPrompt}
+                            onChange={(e) => setCustomPrompt(e.target.value)}
+                            placeholder="e.g. Why Next.js 15 is a game-changer for BytesCraft clients..."
+                            style={{
+                                width: '100%',
+                                padding: '0.85rem 1rem',
+                                borderRadius: '12px',
+                                background: 'rgba(0, 0, 0, 0.4)',
+                                border: '1px solid var(--border-subtle)',
+                                color: '#fff',
+                                fontSize: '0.9rem',
+                                outline: 'none'
+                            }}
+                        />
+                    </div>
+                    <div>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', fontSize: '0.85rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--text-main)' }}>
+                            <FileText size={16} color="#facc15" /> Source Data / URL for AI Processing (New Skill)
+                        </label>
+                        <textarea
+                            value={window.sourceData || ''}
+                            onChange={(e) => { window.sourceData = e.target.value; setCustomPrompt(customPrompt); /* trigger re-render */ }}
+                            placeholder="Paste an article, raw data, or bullet points here. AI will process and extract data to create the post."
+                            rows={3}
+                            style={{
+                                width: '100%',
+                                padding: '0.85rem 1rem',
+                                borderRadius: '12px',
+                                background: 'rgba(0, 0, 0, 0.4)',
+                                border: '1px solid var(--border-subtle)',
+                                color: '#fff',
+                                fontSize: '0.9rem',
+                                outline: 'none',
+                                resize: 'vertical'
+                            }}
+                        />
+                    </div>
                 </div>
 
                 {/* Generate Button */}

@@ -6,7 +6,7 @@ import GraphicCanvasDesigner from './components/GraphicCanvasDesigner';
 import MultiChannelPreview from './components/MultiChannelPreview';
 import SchedulerQueue from './components/SchedulerQueue';
 import ApiConfigModal from './components/ApiConfigModal';
-import { generateSocialPostBundle } from './services/aiGenerator';
+import { generateSocialPostBundle, generateFallbackSocialPostBundle } from './services/aiGenerator';
 import { getQueue, saveQueue, publishPostToPlatforms } from './services/socialPublisher';
 
 export default function App() {
@@ -22,9 +22,10 @@ export default function App() {
         const savedQueue = getQueue();
         if (savedQueue && savedQueue.length > 0) {
             setQueue(savedQueue);
+            setCurrentPost(savedQueue[0]);
         } else {
             // Auto-generate initial post for BytesCraft Studio on launch
-            const demoPost = generateSocialPostBundle({
+            const demoPost = generateFallbackSocialPostBundle({
                 serviceId: 'web-apps',
                 goalId: 'spotlight',
                 themeId: 'cyber-dark'
@@ -35,19 +36,23 @@ export default function App() {
         }
     }, []);
 
-    const handleGeneratePost = (params) => {
+    const handleGeneratePost = async (params) => {
         setIsGenerating(true);
-        setTimeout(() => {
-            const bundle = generateSocialPostBundle(params);
+        try {
+            const bundle = await generateSocialPostBundle(params);
             setCurrentPost(bundle);
 
             // Add to local queue list
-            const updated = [bundle, ...queue];
-            setQueue(updated);
-            saveQueue(updated);
-
+            setQueue(prevQueue => {
+                const updated = [bundle, ...prevQueue];
+                saveQueue(updated);
+                return updated;
+            });
+        } catch (err) {
+            console.error('Post generation failed:', err);
+        } finally {
             setIsGenerating(false);
-        }, 600);
+        }
     };
 
     const handlePublishSuccess = (publishedPost) => {
@@ -101,6 +106,7 @@ export default function App() {
                             <PostGenerator
                                 onGenerate={handleGeneratePost}
                                 isGenerating={isGenerating}
+                                onOpenApiConfig={() => setIsApiModalOpen(true)}
                             />
 
                             {currentPost && (

@@ -7,23 +7,29 @@
 const LOCAL_STORAGE_KEY_QUEUE = 'bytescraft_social_queue';
 const LOCAL_STORAGE_KEY_CONFIG = 'bytescraft_api_credentials';
 
+const DEFAULT_CONFIG = {
+    geminiApiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '',
+    geminiModel: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_MODEL) || 'gemini-1.5-flash',
+    metaAccessToken: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_META_ACCESS_TOKEN) || '',
+    facebookPageId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FACEBOOK_PAGE_ID) || '',
+    instagramAccountId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAGRAM_ACCOUNT_ID) || '',
+    linkedinAccessToken: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LINKEDIN_ACCESS_TOKEN) || '',
+    linkedinOrganizationId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_LINKEDIN_ORGANIZATION_ID) || '',
+    autoPilotEnabled: true,
+    postingIntervalHours: 24,
+    useLiveApisIfPresent: true
+};
+
 export function getApiConfig() {
     try {
         const saved = localStorage.getItem(LOCAL_STORAGE_KEY_CONFIG);
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+            return { ...DEFAULT_CONFIG, ...JSON.parse(saved) };
+        }
     } catch (e) {
         console.error("Error loading API credentials", e);
     }
-    return {
-        metaAccessToken: '',
-        facebookPageId: '',
-        instagramAccountId: '',
-        linkedinAccessToken: '',
-        linkedinOrganizationId: '',
-        autoPilotEnabled: true,
-        postingIntervalHours: 24,
-        useLiveApisIfPresent: true
-    };
+    return { ...DEFAULT_CONFIG };
 }
 
 export function saveApiConfig(config) {
@@ -102,16 +108,22 @@ async function publishToFacebook(post, config, imageDataUrl) {
         return { success: false, error: data.error?.message || 'Meta API error' };
     }
 
-    // Autonomous Fallback Simulation (Simulated Meta API Success)
+    // Facebook Native Share Dialog (No token required!)
+    const shareText = encodeURIComponent(post.platforms.facebook.text.substring(0, 500));
+    const shareUrl = encodeURIComponent('https://www.bytescraftstudio.com');
+    const facebookShareUrl = `https://www.facebook.com/sharer/sharer.php?u=${shareUrl}&quote=${shareText}`;
+    window.open(facebookShareUrl, 'FacebookShare', 'width=600,height=500,left=200,top=100');
+
     await new Promise(r => setTimeout(r, 600));
     return {
         success: true,
-        postId: 'fb_post_' + Math.floor(Math.random() * 1000000),
-        simulated: true,
+        postId: 'fb_share_' + Math.floor(Math.random() * 1000000),
+        shareDialog: true,
         timestamp: new Date().toISOString(),
-        message: 'Posted successfully to BytesCraft Facebook Page'
+        message: 'Facebook Share Dialog opened — post and share manually!'
     };
 }
+
 
 async function publishToInstagram(post, config, imageDataUrl) {
     if (config.metaAccessToken && config.instagramAccountId && config.useLiveApisIfPresent) {
