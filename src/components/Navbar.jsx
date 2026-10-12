@@ -1,7 +1,7 @@
 import React from 'react';
-import { Bot, Sparkles, Settings, Zap, Globe, Share2 } from 'lucide-react';
+import { Bot, Sparkles, Settings, Zap, Globe, Share2, Shield } from 'lucide-react';
 
-export default function Navbar({ onOpenApiConfig, activeTab, setActiveTab }) {
+export default function Navbar({ onOpenApiConfig, activeTab, setActiveTab, onLock }) {
     return (
         <header className="glass-panel" style={{ borderRadius: '0 0 20px 20px', borderTop: 'none', padding: '1rem 2rem', marginBottom: '2rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '1rem' }}>
@@ -78,6 +78,16 @@ export default function Navbar({ onOpenApiConfig, activeTab, setActiveTab }) {
                     >
                         <Settings size={15} color="#818cf8" /> API Settings
                     </button>
+                    {onLock && (
+                        <button
+                            onClick={onLock}
+                            className="btn-secondary"
+                            title="Lock Admin Studio"
+                            style={{ fontSize: '0.85rem', padding: '0.5rem 0.8rem', borderColor: 'rgba(239, 68, 68, 0.35)', color: '#fca5a5' }}
+                        >
+                            <Shield size={14} color="#f87171" /> Lock
+                        </button>
+                    )}
                 </div>
 
             </div>

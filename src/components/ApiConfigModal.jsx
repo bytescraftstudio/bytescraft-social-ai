@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { X, Key, ShieldCheck, Check, Info, Sparkles, BookOpen, ExternalLink, Eye, EyeOff, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { X, Key, ShieldCheck, Check, Info, Sparkles, BookOpen, ExternalLink, Eye, EyeOff, AlertCircle, CheckCircle2, RefreshCw, Lock, Shield } from 'lucide-react';
 import { getApiConfig, saveApiConfig } from '../services/socialPublisher';
 import { testGeminiApiKey } from '../services/aiGenerator';
+import { setAdminPin, hasCustomPinConfigured } from '../services/authService';
 
 export default function ApiConfigModal({ isOpen, onClose }) {
     const [config, setConfig] = useState(getApiConfig());
     const [savedSuccess, setSavedSuccess] = useState(false);
-    const [activeTab, setActiveTab] = useState('credentials'); // 'credentials' | 'guide'
+    const [activeTab, setActiveTab] = useState('credentials'); // 'credentials' | 'guide' | 'security'
     const [showTokens, setShowTokens] = useState({});
     const [testingGemini, setTestingGemini] = useState(false);
     const [geminiTestResult, setGeminiTestResult] = useState(null);
+    const [pinInput, setPinInput] = useState('');
+    const [pinConfirm, setPinConfirm] = useState('');
+    const [pinMessage, setPinMessage] = useState({ text: '', isError: false });
 
     useEffect(() => {
         if (isOpen) {
@@ -123,6 +127,27 @@ export default function ApiConfigModal({ isOpen, onClose }) {
                         }}
                     >
                         <Key size={15} /> Credentials & Keys
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setActiveTab('security')}
+                        style={{
+                            flex: 1,
+                            padding: '0.55rem',
+                            borderRadius: '9px',
+                            border: 'none',
+                            background: activeTab === 'security' ? 'var(--primary-gradient)' : 'transparent',
+                            color: '#fff',
+                            fontWeight: 600,
+                            fontSize: '0.85rem',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '0.4rem'
+                        }}
+                    >
+                        <Shield size={15} /> Admin Security PIN
                     </button>
                     <button
                         type="button"
@@ -503,6 +528,133 @@ export default function ApiConfigModal({ isOpen, onClose }) {
                         </button>
 
                     </form>
+                )}
+
+                {/* Tab: Admin Security & PIN */}
+                {activeTab === 'security' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
+                        <div style={{
+                            background: 'rgba(99, 102, 241, 0.08)',
+                            border: '1px solid rgba(99, 102, 241, 0.3)',
+                            borderRadius: '14px',
+                            padding: '1.25rem'
+                        }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', marginBottom: '0.75rem' }}>
+                                <ShieldCheck size={20} color="#818cf8" />
+                                <h4 style={{ fontSize: '1rem', fontWeight: 700, color: '#818cf8' }}>
+                                    Admin Security & Access Lock
+                                </h4>
+                            </div>
+                            <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', marginBottom: '1rem', lineHeight: 1.5 }}>
+                                Protect your social media automation studio, connected accounts, and API keys. Whenever someone visits your site, they must enter your master PIN to access the studio.
+                            </p>
+
+                            <div style={{
+                                background: 'rgba(0, 0, 0, 0.4)',
+                                border: '1px solid var(--border-subtle)',
+                                borderRadius: '10px',
+                                padding: '0.85rem 1rem',
+                                marginBottom: '1.25rem',
+                                fontSize: '0.82rem',
+                                color: '#e2e8f0'
+                            }}>
+                                <div>🔐 <strong>Status:</strong> {hasCustomPinConfigured() ? <span style={{ color: '#10b981' }}>Active (Custom Admin PIN Set)</span> : <span style={{ color: '#f59e0b' }}>Active (Default Master PIN: 8899)</span>}</div>
+                                <div style={{ marginTop: '0.3rem', color: 'var(--text-muted)' }}>
+                                    Tip: You can lock the studio anytime by clicking the <strong>"Lock"</strong> button in the top navigation bar.
+                                </div>
+                            </div>
+
+                            {pinMessage.text && (
+                                <div style={{
+                                    background: pinMessage.isError ? 'rgba(239, 68, 68, 0.15)' : 'rgba(16, 185, 129, 0.15)',
+                                    border: `1px solid ${pinMessage.isError ? 'rgba(239, 68, 68, 0.4)' : 'rgba(16, 185, 129, 0.4)'}`,
+                                    color: pinMessage.isError ? '#fca5a5' : '#6ee7b7',
+                                    padding: '0.65rem 1rem',
+                                    borderRadius: '8px',
+                                    fontSize: '0.85rem',
+                                    marginBottom: '1rem'
+                                }}>
+                                    {pinMessage.text}
+                                </div>
+                            )}
+
+                            <form onSubmit={(e) => {
+                                e.preventDefault();
+                                setPinMessage({ text: '', isError: false });
+                                if (pinInput.length < 4) {
+                                    setPinMessage({ text: 'PIN must be at least 4 digits!', isError: true });
+                                    return;
+                                }
+                                if (pinInput !== pinConfirm) {
+                                    setPinMessage({ text: 'PIN confirmation does not match!', isError: true });
+                                    return;
+                                }
+                                try {
+                                    setAdminPin(pinInput);
+                                    setPinMessage({ text: 'Admin PIN updated successfully! 🎉', isError: false });
+                                    setPinInput('');
+                                    setPinConfirm('');
+                                } catch (err) {
+                                    setPinMessage({ text: err.message, isError: true });
+                                }
+                            }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.85rem', marginBottom: '1rem' }}>
+                                    <div>
+                                        <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                                            New 4-6 Digit Admin PIN:
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={pinInput}
+                                            onChange={(e) => setPinInput(e.target.value)}
+                                            placeholder="Enter new PIN"
+                                            maxLength={8}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.65rem 0.85rem',
+                                                borderRadius: '8px',
+                                                background: 'rgba(0,0,0,0.5)',
+                                                border: '1px solid var(--border-subtle)',
+                                                color: '#fff',
+                                                fontSize: '0.9rem',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                    </div>
+                                    <div>
+                                        <label style={{ fontSize: '0.78rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>
+                                            Confirm New PIN:
+                                        </label>
+                                        <input
+                                            type="password"
+                                            value={pinConfirm}
+                                            onChange={(e) => setPinConfirm(e.target.value)}
+                                            placeholder="Re-type new PIN"
+                                            maxLength={8}
+                                            style={{
+                                                width: '100%',
+                                                padding: '0.65rem 0.85rem',
+                                                borderRadius: '8px',
+                                                background: 'rgba(0,0,0,0.5)',
+                                                border: '1px solid var(--border-subtle)',
+                                                color: '#fff',
+                                                fontSize: '0.9rem',
+                                                boxSizing: 'border-box'
+                                            }}
+                                        />
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="submit"
+                                    className="btn-primary"
+                                    style={{ justifyContent: 'center', padding: '0.75rem 1.5rem' }}
+                                >
+                                    <Lock size={15} /> Update Admin PIN
+                                </button>
+                            </form>
+                        </div>
+                    </div>
                 )}
 
                 {/* Tab 2: Step-by-Step API Guide */}

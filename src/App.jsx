@@ -6,10 +6,13 @@ import GraphicCanvasDesigner from './components/GraphicCanvasDesigner';
 import MultiChannelPreview from './components/MultiChannelPreview';
 import SchedulerQueue from './components/SchedulerQueue';
 import ApiConfigModal from './components/ApiConfigModal';
+import AdminLockScreen from './components/AdminLockScreen';
 import { generateSocialPostBundle, generateFallbackSocialPostBundle } from './services/aiGenerator';
 import { getQueue, saveQueue, publishPostToPlatforms } from './services/socialPublisher';
+import { isAuthenticated, lockAppSession } from './services/authService';
 
 export default function App() {
+    const [isLocked, setIsLocked] = useState(!isAuthenticated());
     const [activeTab, setActiveTab] = useState('generator'); // 'generator', 'queue', 'overview'
     const [isApiModalOpen, setIsApiModalOpen] = useState(false);
     const [isGenerating, setIsGenerating] = useState(false);
@@ -78,6 +81,19 @@ export default function App() {
         }
     };
 
+    const handleUnlock = () => {
+        setIsLocked(false);
+    };
+
+    const handleLock = () => {
+        lockAppSession();
+        setIsLocked(true);
+    };
+
+    if (isLocked) {
+        return <AdminLockScreen onUnlock={handleUnlock} />;
+    }
+
     return (
         <div style={{ minHeight: '100vh', paddingBottom: '3rem' }}>
             <div style={{ maxWidth: '1380px', margin: '0 auto', padding: '0 1rem' }}>
@@ -87,6 +103,7 @@ export default function App() {
                     onOpenApiConfig={() => setIsApiModalOpen(true)}
                     activeTab={activeTab}
                     setActiveTab={setActiveTab}
+                    onLock={handleLock}
                 />
 
                 {/* Main Content Areas */}
