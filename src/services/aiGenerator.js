@@ -77,20 +77,15 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
 }
 `;
 
-    const candidateModels = [
-        model || 'gemini-2.0-flash',
-        'gemini-2.0-flash',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash-lite',
-        'gemini-1.5-flash-latest'
-    ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
-
+    let activeModel = model || 'gemini-2.0-flash';
     let candidateText = null;
     let lastErrorMsg = '';
 
-    for (const activeModel of candidateModels) {
+    const directCandidates = [activeModel, 'gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'].filter((m, i, arr) => m && arr.indexOf(m) === i);
+
+    for (const m of directCandidates) {
         try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${apiKey}`;
             const res = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -107,7 +102,7 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
                 const data = await res.json();
                 candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (candidateText) {
-                    model = activeModel;
+                    activeModel = m;
                     break;
                 }
             } else {
@@ -116,6 +111,41 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
             }
         } catch (e) {
             lastErrorMsg = e.message;
+        }
+    }
+
+    // Dynamic model discovery fallback if static candidates missed
+    if (!candidateText) {
+        try {
+            const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+            if (listRes.ok) {
+                const listData = await listRes.json();
+                const available = (listData.models || [])
+                    .filter(mod => mod.supportedGenerationMethods?.includes('generateContent'))
+                    .map(mod => mod.name.replace(/^models\//, ''));
+
+                for (const fallbackModel of available) {
+                    const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${fallbackModel}:generateContent?key=${apiKey}`;
+                    const res = await fetch(fallbackUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            contents: [{ parts: [{ text: promptText }] }],
+                            generationConfig: { temperature: 0.7, responseMimeType: 'application/json' }
+                        })
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                        if (candidateText) {
+                            activeModel = fallbackModel;
+                            break;
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn('[ModelService] Auto-discovery error:', err);
         }
     }
 
@@ -157,58 +187,87 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
             facebook: { text: `${parsed.facebookCopy}\n\n${callToAction}\n\n${facebookTags}` }
         },
         hashtags: parsed.hashtags || { linkedin: [], instagram: [], facebook: [] },
-        aiEngine: `Gemini (${model})`,
+        aiEngine: `Gemini (${activeModel})`,
         status: 'draft'
     };
 }
 
 /**
- * Test a Gemini API key
+ * Test a Gemini API key using dynamic Google ModelService query
  */
-export async function testGeminiApiKey(apiKey, requestedModel = 'gemini-2.0-flash') {
+export async function testGeminiApiKey(apiKey, requestedModel = '') {
     if (!apiKey || !apiKey.trim()) {
         return { success: false, error: 'API key is empty' };
     }
 
     const cleanKey = apiKey.trim();
-    const candidateModels = [
-        requestedModel,
-        'gemini-2.0-flash',
-        'gemini-2.5-flash',
-        'gemini-2.0-flash-lite',
-        'gemini-1.5-flash-latest'
-    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-    let lastError = '';
+    try {
+        // Step 1: Query Google ModelService for actual supported models for this project
+        const listUrl = `https://generativelanguage.googleapis.com/v1beta/models?key=${cleanKey}`;
+        const listRes = await fetch(listUrl);
 
-    for (const model of candidateModels) {
-        try {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
-            const res = await fetch(url, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: 'Ping. Respond with valid JSON: {"status": "ok"}' }] }],
-                    generationConfig: { responseMimeType: 'application/json' }
-                })
-            });
-
-            if (res.ok) {
-                return {
-                    success: true,
-                    workingModel: model,
-                    message: `Successfully connected to Gemini API (${model})!`
-                };
-            }
-
-            const data = await res.json().catch(() => ({}));
-            lastError = data.error?.message || `HTTP ${res.status}: ${res.statusText}`;
-        } catch (err) {
-            lastError = err.message || 'Network connection failed';
+        if (!listRes.ok) {
+            const errData = await listRes.json().catch(() => ({}));
+            return {
+                success: false,
+                error: errData.error?.message || `Google API Key invalid (HTTP ${listRes.status})`
+            };
         }
-    }
 
-    return { success: false, error: lastError };
+        const listJson = await listRes.json();
+        const models = listJson.models || [];
+        const contentModels = models
+            .filter(m => m.supportedGenerationMethods && m.supportedGenerationMethods.includes('generateContent'))
+            .map(m => m.name.replace(/^models\//, ''));
+
+        if (contentModels.length === 0) {
+            return {
+                success: false,
+                error: 'No models supporting generateContent found for this API Key.'
+            };
+        }
+
+        // Determine which model to test
+        let chosenModel = '';
+        if (requestedModel && contentModels.includes(requestedModel)) {
+            chosenModel = requestedModel;
+        } else {
+            chosenModel = contentModels.find(m => m.includes('2.5-flash'))
+                || contentModels.find(m => m.includes('2.0-flash'))
+                || contentModels.find(m => m.includes('flash'))
+                || contentModels.find(m => m.includes('pro'))
+                || contentModels[0];
+        }
+
+        // Step 2: Test ping generateContent with chosen model
+        const testUrl = `https://generativelanguage.googleapis.com/v1beta/models/${chosenModel}:generateContent?key=${cleanKey}`;
+        const pingRes = await fetch(testUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: 'Respond with valid JSON: {"status": "ok"}' }] }],
+                generationConfig: { responseMimeType: 'application/json' }
+            })
+        });
+
+        if (!pingRes.ok) {
+            const pErr = await pingRes.json().catch(() => ({}));
+            return {
+                success: false,
+                error: pErr.error?.message || `Model ${chosenModel} test failed`
+            };
+        }
+
+        return {
+            success: true,
+            workingModel: chosenModel,
+            availableModels: contentModels,
+            message: `Successfully connected to Gemini API (${chosenModel})!`
+        };
+    } catch (err) {
+        return { success: false, error: err.message || 'Network error connecting to Google AI Studio' };
+    }
 }
 
 /**

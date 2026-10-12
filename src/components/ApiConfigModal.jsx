@@ -11,6 +11,7 @@ export default function ApiConfigModal({ isOpen, onClose }) {
     const [showTokens, setShowTokens] = useState({});
     const [testingGemini, setTestingGemini] = useState(false);
     const [geminiTestResult, setGeminiTestResult] = useState(null);
+    const [discoveredModels, setDiscoveredModels] = useState([]);
     const [pinInput, setPinInput] = useState('');
     const [pinConfirm, setPinConfirm] = useState('');
     const [pinMessage, setPinMessage] = useState({ text: '', isError: false });
@@ -41,9 +42,12 @@ export default function ApiConfigModal({ isOpen, onClose }) {
         setTestingGemini(true);
         setGeminiTestResult(null);
         try {
-            const res = await testGeminiApiKey(config.geminiApiKey, config.geminiModel || 'gemini-2.0-flash');
+            const res = await testGeminiApiKey(config.geminiApiKey, config.geminiModel || '');
             if (res.success) {
-                if (res.workingModel && res.workingModel !== config.geminiModel) {
+                if (res.availableModels && res.availableModels.length > 0) {
+                    setDiscoveredModels(res.availableModels);
+                }
+                if (res.workingModel) {
                     handleChange('geminiModel', res.workingModel);
                 }
                 setGeminiTestResult({ success: true, message: res.message });
@@ -265,11 +269,19 @@ export default function ApiConfigModal({ isOpen, onClose }) {
                                                 fontSize: '0.85rem'
                                             }}
                                         >
-                                            <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended & Ultra Fast)</option>
-                                            <option value="gemini-2.5-flash">gemini-2.5-flash (Next Generation)</option>
-                                            <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (Cost Efficient)</option>
-                                            <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
-                                            <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning)</option>
+                                            {discoveredModels.length > 0 ? (
+                                                discoveredModels.map(m => (
+                                                    <option key={m} value={m}>{m} (Verified for your key)</option>
+                                                ))
+                                            ) : (
+                                                <>
+                                                    <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended & Ultra Fast)</option>
+                                                    <option value="gemini-2.5-flash">gemini-2.5-flash (Next Generation)</option>
+                                                    <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (Cost Efficient)</option>
+                                                    <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
+                                                    <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning)</option>
+                                                </>
+                                            )}
                                         </select>
                                     </div>
 
