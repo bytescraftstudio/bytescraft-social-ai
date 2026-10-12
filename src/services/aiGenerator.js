@@ -77,33 +77,50 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
 }
 `;
 
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    const candidateModels = [
+        model || 'gemini-2.0-flash',
+        'gemini-2.0-flash',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-1.5-flash-latest'
+    ].filter((m, idx, arr) => m && arr.indexOf(m) === idx);
 
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            contents: [
-                {
-                    parts: [{ text: promptText }]
+    let candidateText = null;
+    let lastErrorMsg = '';
+
+    for (const activeModel of candidateModels) {
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: promptText }] }],
+                    generationConfig: {
+                        temperature: 0.7,
+                        responseMimeType: 'application/json'
+                    }
+                })
+            });
+
+            if (res.ok) {
+                const data = await res.json();
+                candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (candidateText) {
+                    model = activeModel;
+                    break;
                 }
-            ],
-            generationConfig: {
-                temperature: 0.7,
-                responseMimeType: 'application/json'
+            } else {
+                const errorData = await res.json().catch(() => ({}));
+                lastErrorMsg = errorData.error?.message || `Gemini status ${res.status}`;
             }
-        })
-    });
-
-    if (!res.ok) {
-        const errorData = await res.json().catch(() => ({}));
-        throw new Error(errorData.error?.message || `Gemini API returned status ${res.status}`);
+        } catch (e) {
+            lastErrorMsg = e.message;
+        }
     }
 
-    const data = await res.json();
-    const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!candidateText) {
-        throw new Error('No content received from Gemini API');
+        throw new Error(lastErrorMsg || 'No content received from Gemini API');
     }
 
     const parsed = parseGeminiJson(candidateText);
@@ -148,31 +165,50 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
 /**
  * Test a Gemini API key
  */
-export async function testGeminiApiKey(apiKey, model = 'gemini-1.5-flash') {
+export async function testGeminiApiKey(apiKey, requestedModel = 'gemini-2.0-flash') {
     if (!apiKey || !apiKey.trim()) {
         return { success: false, error: 'API key is empty' };
     }
 
-    try {
-        const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey.trim()}`;
-        const res = await fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                contents: [{ parts: [{ text: 'Ping. Respond with valid JSON: {"status": "ok"}' }] }],
-                generationConfig: { responseMimeType: 'application/json' }
-            })
-        });
+    const cleanKey = apiKey.trim();
+    const candidateModels = [
+        requestedModel,
+        'gemini-2.0-flash',
+        'gemini-2.5-flash',
+        'gemini-2.0-flash-lite',
+        'gemini-1.5-flash-latest'
+    ].filter((m, i, arr) => m && arr.indexOf(m) === i);
 
-        if (!res.ok) {
+    let lastError = '';
+
+    for (const model of candidateModels) {
+        try {
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${cleanKey}`;
+            const res = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    contents: [{ parts: [{ text: 'Ping. Respond with valid JSON: {"status": "ok"}' }] }],
+                    generationConfig: { responseMimeType: 'application/json' }
+                })
+            });
+
+            if (res.ok) {
+                return {
+                    success: true,
+                    workingModel: model,
+                    message: `Successfully connected to Gemini API (${model})!`
+                };
+            }
+
             const data = await res.json().catch(() => ({}));
-            return { success: false, error: data.error?.message || `HTTP ${res.status}: ${res.statusText}` };
+            lastError = data.error?.message || `HTTP ${res.status}: ${res.statusText}`;
+        } catch (err) {
+            lastError = err.message || 'Network connection failed';
         }
-
-        return { success: true, message: `Successfully connected to Gemini API (${model})!` };
-    } catch (err) {
-        return { success: false, error: err.message || 'Network connection failed' };
     }
+
+    return { success: false, error: lastError };
 }
 
 /**

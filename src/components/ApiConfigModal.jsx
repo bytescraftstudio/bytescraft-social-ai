@@ -41,8 +41,11 @@ export default function ApiConfigModal({ isOpen, onClose }) {
         setTestingGemini(true);
         setGeminiTestResult(null);
         try {
-            const res = await testGeminiApiKey(config.geminiApiKey, config.geminiModel || 'gemini-1.5-flash');
+            const res = await testGeminiApiKey(config.geminiApiKey, config.geminiModel || 'gemini-2.0-flash');
             if (res.success) {
+                if (res.workingModel && res.workingModel !== config.geminiModel) {
+                    handleChange('geminiModel', res.workingModel);
+                }
                 setGeminiTestResult({ success: true, message: res.message });
             } else {
                 setGeminiTestResult({ success: false, message: res.error });
@@ -250,7 +253,7 @@ export default function ApiConfigModal({ isOpen, onClose }) {
                                             Model
                                         </label>
                                         <select
-                                            value={config.geminiModel || 'gemini-1.5-flash'}
+                                            value={config.geminiModel || 'gemini-2.0-flash'}
                                             onChange={(e) => handleChange('geminiModel', e.target.value)}
                                             style={{
                                                 width: '100%',
@@ -262,8 +265,10 @@ export default function ApiConfigModal({ isOpen, onClose }) {
                                                 fontSize: '0.85rem'
                                             }}
                                         >
-                                            <option value="gemini-1.5-flash">gemini-1.5-flash (Fastest & Free)</option>
-                                            <option value="gemini-2.0-flash">gemini-2.0-flash (Next Gen)</option>
+                                            <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended & Ultra Fast)</option>
+                                            <option value="gemini-2.5-flash">gemini-2.5-flash (Next Generation)</option>
+                                            <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (Cost Efficient)</option>
+                                            <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
                                             <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning)</option>
                                         </select>
                                     </div>

@@ -9,7 +9,7 @@ const LOCAL_STORAGE_KEY_CONFIG = 'bytescraft_api_credentials';
 
 const DEFAULT_CONFIG = {
     geminiApiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '',
-    geminiModel: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_MODEL) || 'gemini-1.5-flash',
+    geminiModel: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_MODEL) || 'gemini-2.0-flash',
     metaAccessToken: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_META_ACCESS_TOKEN) || '',
     facebookPageId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_FACEBOOK_PAGE_ID) || '',
     instagramAccountId: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_INSTAGRAM_ACCOUNT_ID) || '',
