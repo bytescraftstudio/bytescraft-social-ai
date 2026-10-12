@@ -275,11 +275,10 @@ export default function ApiConfigModal({ isOpen, onClose }) {
                                                 ))
                                             ) : (
                                                 <>
-                                                    <option value="gemini-2.0-flash">gemini-2.0-flash (Recommended & Ultra Fast)</option>
-                                                    <option value="gemini-2.5-flash">gemini-2.5-flash (Next Generation)</option>
-                                                    <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite (Cost Efficient)</option>
-                                                    <option value="gemini-1.5-flash-latest">gemini-1.5-flash-latest</option>
-                                                    <option value="gemini-1.5-pro">gemini-1.5-pro (Deep Reasoning)</option>
+                                                    <option value="gemini-3.8-flash">gemini-3.8-flash (Latest Official - Required for New Keys)</option>
+                                                    <option value="gemini-2.0-flash">gemini-2.0-flash (Ultra Fast)</option>
+                                                    <option value="gemini-2.5-flash">gemini-2.5-flash</option>
+                                                    <option value="gemini-2.0-flash-lite">gemini-2.0-flash-lite</option>
                                                 </>
                                             )}
                                         </select>
