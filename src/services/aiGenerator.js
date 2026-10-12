@@ -71,9 +71,17 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
     "instagram": ["#BytesCraftStudio", "#CodingLife", "#FullStack", "#DevCommunity", "#TechStartup"],
     "facebook": ["#BytesCraftStudio", "#CustomSoftware", "#SoftwareCompany"]
   },
-  "graphicTitle": "Short title for banner graphic (max 4 words)",
-  "graphicSubtitle": "Short subheader for banner graphic (max 7 words)",
-  "badgeText": "Short badge tag (e.g. HIGH PERFORMANCE, CLOUD SCALING, AI AGENTS)"
+  "graphicTitle": "Engaging infographic headline (e.g. The 5 Stages of Software Debugging or 5 Rules of Fast Web Apps)",
+  "highlightWord": "Key word from graphicTitle to highlight with bold emerald/accent color (e.g. Debugging)",
+  "stages": [
+    { "num": 1, "title": "Denial", "icon": "😑", "isFinal": false },
+    { "num": 2, "title": "Anger", "icon": "😠", "isFinal": false },
+    { "num": 3, "title": "Bargaining", "icon": "🤝", "isFinal": false },
+    { "num": 4, "title": "Despair", "icon": "😞", "isFinal": false },
+    { "num": 5, "title": "Victory", "icon": "✅", "isFinal": true }
+  ],
+  "graphicSubtitle": "Short subheader for graphic (max 7 words)",
+  "badgeText": "Short badge tag (e.g. DEBUGGING, ARCHITECTURE, SCALING)"
 }
 `;
 
@@ -160,6 +168,14 @@ You MUST respond with valid JSON matching EXACTLY this structure (do not wrap in
     const graphicConfig = {
         title: parsed.graphicTitle || topicTitle,
         subtitle: parsed.graphicSubtitle || service.tagline,
+        highlightWord: parsed.highlightWord || '',
+        stages: Array.isArray(parsed.stages) && parsed.stages.length >= 3 ? parsed.stages : [
+            { num: 1, title: 'Denial', icon: '😑', isFinal: false },
+            { num: 2, title: 'Anger', icon: '😠', isFinal: false },
+            { num: 3, title: 'Bargaining', icon: '🤝', isFinal: false },
+            { num: 4, title: 'Despair', icon: '😞', isFinal: false },
+            { num: 5, title: 'Victory', icon: '✅', isFinal: true }
+        ],
         serviceName: service.name,
         category: service.category,
         badgeText: parsed.badgeText || service.badge,
@@ -298,8 +314,16 @@ export function generateFallbackSocialPostBundle({ serviceId, goalId, customProm
     const callToAction = "🚀 Ready to build high-performance software? Let's talk: https://www.bytescraftstudio.com/";
 
     const graphicConfig = {
-        title: topicTitle,
+        title: customPrompt ? customPrompt : `The 5 Stages of ${service.name}`,
         subtitle: service.tagline,
+        highlightWord: service.name.split(' ')[0] || 'Software',
+        stages: [
+            { num: 1, title: 'Denial & Confusion', icon: '😑', isFinal: false },
+            { num: 2, title: 'Frustration', icon: '😠', isFinal: false },
+            { num: 3, title: 'Research & Planning', icon: '🤝', isFinal: false },
+            { num: 4, title: 'Implementation', icon: '⚙️', isFinal: false },
+            { num: 5, title: 'Victory & Launch', icon: '✅', isFinal: true }
+        ],
         serviceName: service.name,
         category: service.category,
         badgeText: service.badge,
